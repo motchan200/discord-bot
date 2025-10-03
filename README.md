@@ -1,8 +1,10 @@
-# 🎮 Discord Gaming Bot
+# 🤖 Discord Bot
 
-Discord.jsを使用した多機能ゲーミングボットです。
+Discord.jsを使用した多機能コミュニティボットです。ガチャ、カジノゲーム、職業システム、取引システムなどの楽しい機能を搭載しています。
 
 ## ✨ 主な機能
+
+このDiscordボットは、サーバーメンバーが楽しめる様々なインタラクティブな機能を提供します。
 
 ### 🎰 ガチャシステム
 - `/roll` - ガチャを回す
@@ -33,8 +35,8 @@ Discord.jsを使用した多機能ゲーミングボットです。
 
 ### 1. リポジトリのクローン
 ```bash
-git clone https://github.com/yourusername/discord-gaming-bot.git
-cd discord-gaming-bot
+git clone https://github.com/motchan200/-.git
+cd discord-bot
 ```
 
 ### 2. 依存関係のインストール
@@ -67,7 +69,7 @@ npm run pm2:start
 ## 📁 プロジェクト構成
 
 ```
-discord-gaming-bot/
+discord-bot/
 ├── src/                    # ソースコード
 │   ├── index.js           # メインエントリーポイント
 │   ├── config.js          # 設定データ
@@ -151,4 +153,4 @@ MIT License
 
 ---
 
-✨ **楽しいDiscord体験を提供するゲーミングボット！** ✨
+✨ **楽しいDiscord体験を提供するコミュニティボット！** ✨
