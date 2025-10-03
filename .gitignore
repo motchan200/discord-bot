@@ -1,0 +1,43 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 環境変数
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ログファイル
+logs/
+*.log
+
+# データベースファイル
+*.db
+*.sqlite
+*.sqlite3
+
+# OS関連
+.DS_Store
+Thumbs.db
+
+# IDE関連
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 一時ファイル
+tmp/
+temp/
+
+# パスワード・トークン関連
+config.json
+token.txt
+passwords.txt
+
+# PM2関連
+.pm2/
