@@ -94,6 +94,27 @@ export const SPECIAL_ITEMS = [
   { name: "詫び石", rarity: "SPECIAL", price: 0, effect: "SR以上確定10連ガチャ", usable: true }
 ];
 
+// 隠しコマンド.roll専用アイテム
+export const HIDDEN_ROLL_ITEMS = [
+  { name: "株券", rarity: "LR", rate: 0.70, price: 0, effect: "所持金1000億円失うか100億～150億円獲得確率7:3", usable: true },
+  { name: "飴玉", rarity: "LR", rate: 0.25, price: 0, effect: "かみ砕けたら所持金2倍砕けなかったら所持金0.25倍確率0.5:9.5", usable: true },
+  { name: "エナドリ", rarity: "LLR", rate: 0.05, price: 0, effect: "効果なし", usable: false }
+];
+
+// リーフガチャ専用アイテム
+export const LEAF_GACHA_ITEMS = [
+  { name: "芽吹きの葉", rarity: "N", rate: 0.35, price: 100, effect: "ー", description: "小さな若葉。始まりを象徴する、最初の一歩。" },
+  { name: "まんまるキノコ", rarity: "N", rate: 0.30, price: 150, effect: "ー", description: "森の中で静かに光る丸いキノコ。触るとほんのり温かい。" },
+  { name: "幸運のクローバー", rarity: "R", rate: 0.20, price: 300, effect: "運気が少しだけ上向く", description: "四つ葉の奇跡。運気が少しだけ上向く。" },
+  { name: "風渡る稲穂", rarity: "SR", rate: 0.08, price: 600, effect: "ー", description: "黄金色に実る穂。努力と実りの象徴。" },
+  { name: "風精の葉っぱ", rarity: "SR", rate: 0.05, price: 800, effect: "Bot内の待機時間を即時リセット", description: "風の精霊が宿る葉。吹き抜ける風のように軽やか。", usable: true },
+  { name: "紅蓮のバラ", rarity: "SSR", rate: 0.015, price: 1200, effect: "ー", description: "情熱の象徴。見る者の心を奮い立たせる深紅の花。" },
+  { name: "陽光のヒマワリ", rarity: "UR", rate: 0.004, price: 2000, effect: "ー", description: "太陽に向かって咲く、明るさと希望の象徴。" },
+  { name: "翠玉のツタ", rarity: "LR", rate: 0.0008, price: 5000, effect: "ー", description: "神秘的なツタ。互いの心をつなぐ絆の象徴。" },
+  { name: "夢咲くサクラ", rarity: "LR", rate: 0.00015, price: 7000, effect: "ー", description: "一瞬の輝きを永遠に残す夢の花。桜色に染まる空想。" },
+  { name: "古代樹ユグドラシル", rarity: "LR", rate: 0.00005, price: 10000, effect: "ー", description: "世界を支える伝説の大樹。存在するだけで神聖な気配を放つ。" }
+];
+
 // デイリークエスト内容
 export const DAILY_QUESTS = [
   { id: 1, description: "メッセージを5回送信する", key: "messages", goal: 5, reward: 10 },

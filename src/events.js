@@ -2,14 +2,49 @@
 import { Events, EmbedBuilder } from 'discord.js';
 import { addPoints } from './database.js';
 import { rollApologyGacha, rollGacha } from './games.js';
+import { rollHiddenGacha } from './gacha.js';
 import { getEffect, consumeLucky, addItem, updateGachaStats } from './database.js';
 import { ITEMS } from './config.js';
 
 // メッセージ作成イベント
 export function handleMessageCreate(client) {
-  client.on(Events.MessageCreate, (message) => {
+  client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) return;
     if (message.content.startsWith('/')) return;
+    
+    // 隠しコマンド .roll [金額] の処理
+    if (message.content.startsWith('.roll ')) {
+      const args = message.content.substring(6).trim();
+      const amount = parseInt(args.replace(/,/g, '')); // カンマを除去して数値に変換
+      
+      if (!isNaN(amount)) {
+        const result = await rollHiddenGacha(message.author.id, amount);
+        
+        if (result.error) {
+          const embed = new EmbedBuilder()
+            .setTitle('🎰 隠しガチャ結果')
+            .setDescription(result.error)
+            .setColor(0xff0000);
+          await message.reply({ embeds: [embed] });
+          return;
+        }
+        
+        const embed = new EmbedBuilder()
+          .setTitle('🎰 隠しガチャ結果')
+          .setDescription(`**${result.item.rarity}【${result.item.name}】を入手！**\n\n💡 効果: ${result.item.effect}`)
+          .addFields({
+            name: '🎯 実行結果',
+            value: result.effectMessage || '効果なし',
+            inline: false
+          })
+          .setFooter({ text: `消費金額: ${result.amountSpent.toLocaleString()}円` })
+          .setColor(result.item.rarity === 'LR' ? 0xffd700 : 0xff69b4);
+        
+        await message.reply({ embeds: [embed] });
+        return;
+      }
+    }
+    
     addPoints(message.author.id, 1);
   });
 }

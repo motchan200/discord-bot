@@ -50,6 +50,39 @@ export async function initializeDatabase() {
     )
   `);
 
+  // 管理者テーブル
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS admins (
+      userId TEXT PRIMARY KEY,
+      permissions TEXT DEFAULT 'all',
+      addedAt INTEGER DEFAULT (strftime('%s', 'now')),
+      addedBy TEXT,
+      FOREIGN KEY (userId) REFERENCES users (id)
+    )
+  `);
+
+  // ログテーブル
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS admin_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      adminId TEXT,
+      action TEXT,
+      target TEXT,
+      details TEXT,
+      timestamp INTEGER DEFAULT (strftime('%s', 'now')),
+      FOREIGN KEY (adminId) REFERENCES users (id)
+    )
+  `);
+
+  // 初期管理者を追加
+  const initialAdmins = ['934136683002232874', '1144238510006620160'];
+  for (const adminId of initialAdmins) {
+    await dbRun(`
+      INSERT OR IGNORE INTO admins (userId, permissions, addedBy, addedAt)
+      VALUES (?, 'all', 'system', strftime('%s', 'now'))
+    `, adminId);
+  }
+
   // デイリーボーナステーブル
   await dbRun(`
     CREATE TABLE IF NOT EXISTS daily (
@@ -209,6 +242,29 @@ export async function initializeDatabase() {
       result TEXT,
       winnings INTEGER,
       createdAt INTEGER
+    )
+  `);
+
+  // 銀行テーブル
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS bank_accounts (
+      userId TEXT PRIMARY KEY,
+      balance INTEGER DEFAULT 0,
+      createdAt INTEGER DEFAULT (strftime('%s', 'now')),
+      FOREIGN KEY (userId) REFERENCES users (id)
+    )
+  `);
+
+  // 銀行取引履歴テーブル
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS bank_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId TEXT,
+      transactionType TEXT,
+      amount INTEGER,
+      balanceAfter INTEGER,
+      createdAt INTEGER DEFAULT (strftime('%s', 'now')),
+      FOREIGN KEY (userId) REFERENCES users (id)
     )
   `);
 }
@@ -661,4 +717,203 @@ export async function getUserAuctionHistory(userId, limit = 20, offset = 0) {
 
 export async function getAuction(auctionId) {
   return await dbGet(`SELECT * FROM auctions WHERE id = ?`, auctionId);
+}
+
+// 銀行関連関数
+export async function getBankAccount(userId) {
+  let account = await dbGet(`SELECT * FROM bank_accounts WHERE userId = ?`, userId);
+  if (!account) {
+    await dbRun(`INSERT INTO bank_accounts (userId, balance) VALUES (?, 0)`, userId);
+    account = { userId, balance: 0, createdAt: Date.now() };
+  }
+  return account;
+}
+
+export async function depositToBank(userId, amount) {
+  const user = await getUser(userId);
+  if (user.points < amount) {
+    throw new Error(`ポイントが足りません。所持ポイント: ${user.points}, 預金額: ${amount}`);
+  }
+
+  await dbRun(`BEGIN TRANSACTION`);
+  
+  try {
+    await subtractPoints(userId, amount);
+    await dbRun(`UPDATE bank_accounts SET balance = balance + ? WHERE userId = ?`, amount, userId);
+    
+    const account = await getBankAccount(userId);
+    await dbRun(`
+      INSERT INTO bank_transactions (userId, transactionType, amount, balanceAfter)
+      VALUES (?, 'deposit', ?, ?)
+    `, userId, amount, account.balance);
+    
+    await dbRun(`COMMIT`);
+    return account;
+  } catch (error) {
+    await dbRun(`ROLLBACK`);
+    throw error;
+  }
+}
+
+export async function withdrawFromBank(userId, amount) {
+  const account = await getBankAccount(userId);
+  if (account.balance < amount) {
+    throw new Error(`銀行残高が足りません。残高: ${account.balance}, 引き出し額: ${amount}`);
+  }
+
+  await dbRun(`BEGIN TRANSACTION`);
+  
+  try {
+    await addPoints(userId, amount);
+    await dbRun(`UPDATE bank_accounts SET balance = balance - ? WHERE userId = ?`, amount, userId);
+    
+    const updatedAccount = await getBankAccount(userId);
+    await dbRun(`
+      INSERT INTO bank_transactions (userId, transactionType, amount, balanceAfter)
+      VALUES (?, 'withdraw', ?, ?)
+    `, userId, amount, updatedAccount.balance);
+    
+    await dbRun(`COMMIT`);
+    return updatedAccount;
+  } catch (error) {
+    await dbRun(`ROLLBACK`);
+    throw error;
+  }
+}
+
+export async function getBankTransactionHistory(userId, limit = 10) {
+  const transactions = await dbAll(`
+    SELECT * FROM bank_transactions
+    WHERE userId = ?
+    ORDER BY createdAt DESC
+    LIMIT ?
+  `, userId, limit);
+  
+  return transactions || [];
+}
+
+// ======== Admin権限管理関数 ========
+
+// 管理者権限チェック
+export async function isAdmin(userId) {
+  const admin = await dbGet(`SELECT * FROM admins WHERE userId = ?`, userId);
+  return admin !== undefined;
+}
+
+// 管理者追加
+export async function addAdmin(userId, addedBy, permissions = 'all') {
+  await dbRun(`
+    INSERT OR REPLACE INTO admins (userId, permissions, addedBy, addedAt)
+    VALUES (?, ?, ?, strftime('%s', 'now'))
+  `, userId, permissions, addedBy);
+}
+
+// 管理者削除
+export async function removeAdmin(userId) {
+  await dbRun(`DELETE FROM admins WHERE userId = ?`, userId);
+}
+
+// 管理者一覧取得
+export async function getAdmins() {
+  return await dbAll(`SELECT * FROM admins ORDER BY addedAt DESC`);
+}
+
+// ログ記録
+export async function logAdminAction(adminId, action, target, details) {
+  await dbRun(`
+    INSERT INTO admin_logs (adminId, action, target, details, timestamp)
+    VALUES (?, ?, ?, ?, strftime('%s', 'now'))
+  `, adminId, action, target, details);
+}
+
+// ログ取得
+export async function getAdminLogs(limit = 50) {
+  return await dbAll(`
+    SELECT * FROM admin_logs 
+    ORDER BY timestamp DESC 
+    LIMIT ?
+  `, limit);
+}
+
+// ユーザー統計取得
+export async function getUserStats() {
+  const totalUsers = await dbGet(`SELECT COUNT(*) as count FROM users`);
+  const totalPoints = await dbGet(`SELECT SUM(points) as total FROM users`);
+  const totalItems = await dbGet(`SELECT COUNT(*) as count FROM items`);
+  const totalTrades = await dbGet(`SELECT COUNT(*) as count FROM trades`);
+  const totalAuctions = await dbGet(`SELECT COUNT(*) as count FROM auctions`);
+  
+  return {
+    totalUsers: totalUsers.count,
+    totalPoints: totalPoints.total || 0,
+    totalItems: totalItems.count,
+    totalTrades: totalTrades.count,
+    totalAuctions: totalAuctions.count
+  };
+}
+
+// 全ユーザーのポイント操作
+export async function multiplyAllPoints(factor) {
+  await dbRun(`UPDATE users SET points = points * ?`, factor);
+}
+
+// 全ユーザーに課税
+export async function taxAllUsers(percentage) {
+  const taxRate = percentage / 100;
+  await dbRun(`UPDATE users SET points = points * (1 - ?)`, taxRate);
+}
+
+// 全ユーザーのポイントリセット
+export async function resetAllPoints() {
+  await dbRun(`UPDATE users SET points = 0`);
+}
+
+// ユーザーの全データリセット
+export async function resetUserData(userId) {
+  await dbRun(`BEGIN TRANSACTION`);
+  try {
+    await dbRun(`DELETE FROM items WHERE userId = ?`, userId);
+    await dbRun(`DELETE FROM effects WHERE userId = ?`, userId);
+    await dbRun(`DELETE FROM daily WHERE userId = ?`, userId);
+    await dbRun(`DELETE FROM work_bonus WHERE userId = ?`, userId);
+    await dbRun(`DELETE FROM user_jobs WHERE userId = ?`, userId);
+    await dbRun(`DELETE FROM trades WHERE sellerId = ? OR buyerId = ?`, userId, userId);
+    await dbRun(`DELETE FROM auctions WHERE sellerId = ? OR currentBidder = ?`, userId, userId);
+    await dbRun(`DELETE FROM bank_accounts WHERE userId = ?`, userId);
+    await dbRun(`DELETE FROM bank_transactions WHERE userId = ?`, userId);
+    await dbRun(`UPDATE users SET points = 0, rolls = 0, leaves = 0 WHERE id = ?`, userId);
+    await dbRun(`COMMIT`);
+  } catch (error) {
+    await dbRun(`ROLLBACK`);
+    throw error;
+  }
+}
+
+// 全ユーザーにアイテム配布
+export async function giveItemToAll(itemName, quantity) {
+  const users = await dbAll(`SELECT id FROM users`);
+  for (const user of users) {
+    await addItem(user.id, itemName, quantity);
+  }
+  return users.length;
+}
+
+// アクティブゲーム強制終了
+export async function forceEndAllGames() {
+  // ブラックジャックゲーム
+  await dbRun(`DELETE FROM blackjack_games`);
+  // バカラゲーム  
+  await dbRun(`DELETE FROM baccarat_games`);
+  // シックボーゲーム
+  await dbRun(`DELETE FROM sicbo_games`);
+  // スロットゲーム
+  await dbRun(`DELETE FROM slot_games`);
+}
+
+// ユーザーのゲーム強制終了
+export async function forceEndUserGames(userId) {
+  await dbRun(`DELETE FROM blackjack_games WHERE userId = ?`, userId);
+  await dbRun(`DELETE FROM baccarat_games WHERE userId = ?`, userId);
+  await dbRun(`DELETE FROM sicbo_games WHERE userId = ?`, userId);
+  await dbRun(`DELETE FROM slot_games WHERE userId = ?`, userId);
 }
